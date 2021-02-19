@@ -12,6 +12,7 @@ import { spawn } from 'child_process';
 import { hostname } from 'os';
 import path from 'path';
 import { PluginUpdatePlatformConfig } from './configTypes';
+import { UiApi } from './ui-api';
 
 let hap: HAP;
 let Accessory: typeof PlatformAccessory;
@@ -23,14 +24,17 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
   private readonly log: Logging;
   private readonly api: API;
   private readonly config: PluginUpdatePlatformConfig;
+  private readonly uiApi: UiApi;
   private accessory?: PlatformAccessory;
   private timer?: NodeJS.Timeout;
   private readonly checkFrequency: number;
+
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.log = log;
     this.config = config as PluginUpdatePlatformConfig;
     this.api = api;
+    this.uiApi = new UiApi(this.api.user.storagePath());
 
     this.checkFrequency = this.config.checkFrequency ?? 60;
 
