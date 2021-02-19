@@ -1,0 +1,26 @@
+{
+    "pluginAlias": "PluginUpdate",
+    "pluginType": "platform",
+    "singular": true,
+    "headerDisplay": "A Homebridge plugin for checking for updates to Homebridge and plugins.",
+    "footerDisplay": "Raise [Issues](https://github.com/Sunoo/homebridge-plugin-update-check/issues) or submit [Pull Requests](https://github.com/Sunoo/homebridge-plugin-update-check/pulls) on [Project Page](https://github.com/Sunoo/homebridge-plugin-update-check).",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "title": "Name",
+                "type": "string",
+                "required": true,
+                "default": "Plugin Update",
+                "description": "A unique name for the accessory. It will be used as the accessory name in HomeKit."
+            },
+            "checkFrequency": {
+                "title": "Check Frequency (Minutes)",
+                "type": "integer",
+                "required": false,
+                "placeholder": 30,
+                "description": "Number of minutes between checks for updates."
+            }
+        }
+    }
+}
