@@ -48,23 +48,33 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.addUpdateAccessory.bind(this));
   }
 
-  async runNcu(options: Array<string>): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
-    options = [
+  async runNcu(args: Array<string>): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+    args = [
       path.resolve(__dirname, '../node_modules/npm-check-updates/bin/cli.js'),
       '--jsonUpgraded',
       '--filter',
       '/^(@.*\\/)?homebridge(-.*)?$/'
-    ].concat(options);
+    ].concat(args);
 
     const output = await new Promise<string>((resolve, reject) => {
       try {
-        const ncu = spawn(process.argv0, options);
+        const ncu = spawn(process.argv0, args, {
+          env: this.isDocker ? { ...process.env, HOME: '/homebridge' } : undefined
+        });
         let stdout = '';
         ncu.stdout.on('data', (chunk: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           stdout += chunk.toString();
         });
+        let stderr = '';
+        ncu.stderr.on('data', (chunk: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+          stderr += chunk.toString();
+        });
         ncu.on('close', () => {
-          resolve(stdout);
+          if (stderr) {
+            reject(stderr);
+          } else {
+            resolve(stdout);
+          }
         });
       } catch (ex) {
         reject(ex);
