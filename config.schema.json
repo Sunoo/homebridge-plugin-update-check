@@ -14,12 +14,10 @@
                 "default": "Plugin Update",
                 "description": "A unique name for the accessory. It will be used as the accessory name in HomeKit."
             },
-            "checkFrequency": {
-                "title": "Check Frequency (Minutes)",
-                "type": "integer",
-                "required": false,
-                "placeholder": 30,
-                "description": "Number of minutes between checks for updates."
+            "forceNcu": {
+                "title": "Force node-check-updates",
+                "type": "boolean",
+                "description": "Force use of node-check-updates instead of homebridge-config-ui-x."
             }
         }
     }

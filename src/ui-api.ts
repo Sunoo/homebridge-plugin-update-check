@@ -1,96 +1,115 @@
-import path from 'path';
-import * as https from 'https';
-import fs from 'fs-extra';
+import {
+  HomebridgeConfig,
+  PlatformIdentifier,
+  PlatformName
+} from 'homebridge';
 import axios from 'axios';
-import * as jwt from 'jsonwebtoken';
+import { readFileSync } from 'fs';
+import https from 'https';
+import jwt from 'jsonwebtoken';
+import path from 'path';
 
-export interface InstalledPlugins {
+export interface InstalledPlugin {
   name: string;
   installedVersion: string;
   latestVersion: string;
-  updateAvailable: string;
+  updateAvailable: boolean;
 }
 
-interface SecretsFileInterface {
+interface SecretsFile {
   secretKey: string;
 }
 
-interface HomebridgeConfig {
-  platforms: Array<{
-    platform: string;
-    host?: string;
-    port?: number;
-    ssl?: {
-      key?: string;
-      pfx?: string;
-    }
-  }>
+interface UiConfig {
+  platform: PlatformName | PlatformIdentifier;
+  host?: string;
+  port?: number;
+  ssl?: {
+    key?: string;
+    pfx?: string;
+  }
 }
 
 export class UiApi {
-  private readonly secretFilePath = path.resolve(this.homebridgeStoragePath, '.uix-secrets');
-  private readonly configFilePath = path.resolve(this.homebridgeStoragePath, 'config.json');
+  private readonly secrets?: SecretsFile;
+  private readonly ssl?: boolean;
+  private readonly baseUrl?: string;
+  private token?: string;
 
-  constructor(
-    private readonly homebridgeStoragePath: string
-  ) {}
+  constructor(hbStoragePath: string) {
+    const configPath = path.resolve(hbStoragePath, 'config.json');
+    const hbConfig = JSON.parse(readFileSync(configPath, 'utf8')) as HomebridgeConfig;
+    const config = hbConfig.platforms.find((config: { platform: string }) =>
+      config.platform === 'config' || config.platform === 'homebridge-config-ui-x.config') as UiConfig;
 
-  public async getPlugins(): Promise<Array<InstalledPlugins>> {
-    const baseUrl = await this.getBaseUrl();
+    if (config) {
+      const secretPath = path.resolve(hbStoragePath, '.uix-secrets');
+      this.secrets = JSON.parse(readFileSync(secretPath, 'utf8'));
 
-    const response = await axios.get(baseUrl + '/api/plugins', {
+      this.ssl = !!config.ssl?.key || !!config.ssl?.pfx;
+
+      const protocol = this.ssl ? 'https://' : 'http://';
+      const host = config.host ?? 'localhost';
+      const port = config.port ?? 8581;
+
+      this.baseUrl = protocol + host + ':' + port.toString();
+    }
+  }
+
+  public isConfigured(): boolean {
+    return this.secrets !== undefined;
+  }
+
+  public async getHomebridge(): Promise<InstalledPlugin> {
+    if (this.isConfigured()) {
+      return await this.makeCall('/api/status/homebridge-version') as InstalledPlugin;
+    } else {
+      return {
+        name: '',
+        installedVersion: '',
+        latestVersion: '',
+        updateAvailable: false
+      };
+    }
+  }
+
+  public async getPlugins(): Promise<Array<InstalledPlugin>> {
+    if (this.isConfigured()) {
+      return await this.makeCall('/api/plugins') as Array<InstalledPlugin>;
+    } else {
+      return [];
+    }
+  }
+
+  private async makeCall(apiPath: string): Promise<unknown> {
+    const response = await axios.get(this.baseUrl + apiPath, {
       headers: {
-        Authorization: 'Bearer ' + await this.getToken()
+        Authorization: 'Bearer ' + this.getToken()
       },
-      httpAgent: baseUrl.startsWith('https://') ? new https.Agent({
-        rejectUnauthorized: false
-      }) : null
+      httpAgent: this.ssl ? new https.Agent({ rejectUnauthorized: false }) : undefined
     });
 
     return response.data;
   }
 
-  private async getBaseUrl(): Promise<string> {
-    let protocol = 'http://';
-    let hostname = 'localhost';
-    let port = 8581;
-
-    const config: HomebridgeConfig = await fs.readJson(this.configFilePath);
-
-    if (typeof config === 'object' && Array.isArray(config.platforms)) {
-      const uiConfig = config.platforms.find(x => x.platform === 'config' || x.platform === 'homebridge-config-ui-x.config');
-
-      if (uiConfig?.host) {
-        hostname = uiConfig.host;
-      }
-
-      if (uiConfig?.port) {
-        port = uiConfig.port;
-      }
-
-      if (uiConfig?.ssl?.key || uiConfig?.ssl?.pfx) {
-        protocol = 'https://';
-      }
+  private getToken(): string {
+    if (this.token) {
+      return this.token;
     }
 
-    return protocol + hostname + ':' + port.toString();
-  }
-
-  private async getToken(): Promise<string> {
-    // load secrets file
-    const secrets: SecretsFileInterface = await fs.readJson(this.secretFilePath);
-
-    // create fake user
-    const user = {
+    const user = { // fake user
       username: 'homebridge-plugin-update-check',
       name: 'homebridge-plugin-update-check',
       admin: true,
       instanceId: 'xxxxxxx'
     };
 
-    // sign token
-    const token = jwt.sign(user, secrets.secretKey, { expiresIn: '1m' });
+    this.token = jwt.sign(user, this.secrets!.secretKey, { expiresIn: '1m' });
 
-    return token;
+    setTimeout(((): void => {
+      this.token = undefined;
+    }).bind(this), 30 * 1000);
+
+    return this.token;
   }
 }

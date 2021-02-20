@@ -1,14 +1,18 @@
 import {
   API,
   APIEvent,
+  Characteristic,
   DynamicPlatformPlugin,
   HAP,
   Logging,
   PlatformAccessory,
   PlatformAccessoryEvent,
-  PlatformConfig
+  PlatformConfig,
+  Service,
+  WithUUID
 } from 'homebridge';
 import { spawn } from 'child_process';
+import fs from 'fs';
 import { hostname } from 'os';
 import path from 'path';
 import { PluginUpdatePlatformConfig } from './configTypes';
@@ -25,71 +29,100 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
   private readonly api: API;
   private readonly config: PluginUpdatePlatformConfig;
   private readonly uiApi: UiApi;
-  private accessory?: PlatformAccessory;
+  private readonly useNcu: boolean;
+  private readonly isDocker: boolean;
+  private readonly serviceType: WithUUID<typeof Service> = hap.Service.MotionSensor;
+  private readonly characteristicType: WithUUID<new () => Characteristic> = hap.Characteristic.MotionDetected;
+  private service?: Service;
   private timer?: NodeJS.Timeout;
-  private readonly checkFrequency: number;
-
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.log = log;
     this.config = config as PluginUpdatePlatformConfig;
     this.api = api;
-    this.uiApi = new UiApi(this.api.user.storagePath());
 
-    this.checkFrequency = this.config.checkFrequency ?? 60;
+    this.uiApi = new UiApi(this.api.user.storagePath());
+    this.useNcu = this.config.forceNcu || !this.uiApi.isConfigured();
+    this.isDocker = fs.existsSync('/homebridge/package.json');
 
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.addUpdateAccessory.bind(this));
-
-    this.timer = setTimeout(this.fetchData.bind(this), this.checkFrequency * 60 * 1000);
   }
 
-  fetchData(): Promise<void> {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = undefined;
-    }
+  async runNcu(options: Array<string>): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+    options = [
+      path.resolve(__dirname, '../node_modules/npm-check-updates/bin/cli.js'),
+      '--jsonUpgraded',
+      '--filter',
+      '/^(@.*\\/)?homebridge(-.*)?$/'
+    ].concat(options);
 
-    return new Promise<string>((resolve, reject) => {
+    const output = await new Promise<string>((resolve, reject) => {
       try {
-        const command = spawn(process.argv0, [
-          path.resolve(__dirname, '../node_modules/npm-check-updates/bin/cli.js'),
-          '--global',
-          '--jsonUpgraded',
-          '--filter',
-          '/^homebridge(-.*)?$/'
-        ]);
+        const ncu = spawn(process.argv0, options);
         let stdout = '';
-        command.stdout.on('data', (chunk: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        ncu.stdout.on('data', (chunk: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           stdout += chunk.toString();
         });
-        command.on('close', () => {
+        ncu.on('close', () => {
           resolve(stdout);
         });
       } catch (ex) {
         reject(ex);
       }
-    })
-      .then(results => {
-        const motionService = this.accessory?.getService(hap.Service.MotionSensor);
-        if (!motionService) {
-          return;
-        }
+    });
 
-        const parse = JSON.parse(results);
-        const length = Object.keys(parse).length;
+    return JSON.parse(output);
+  }
 
-        this.log.debug(length + ' outdated package(s): ' + JSON.stringify(parse));
+  async checkNcu(): Promise<number> {
+    let results = await this.runNcu(['--global']);
 
-        motionService.setCharacteristic(hap.Characteristic.MotionDetected, length > 0);
+    if (this.isDocker) {
+      const dockerResults = await this.runNcu(['--packageFile', '/homebridge/package.json']);
+      results = {...results, ...dockerResults};
+    }
+
+    const updates = Object.keys(results).length;
+    this.log.debug('node-check-updates reports ' + updates +
+      ' outdated package(s): ' + JSON.stringify(results));
+
+    return updates;
+  }
+
+  async checkUi(): Promise<number> {
+    const plugins = await this.uiApi.getPlugins();
+    const homebridge = await this.uiApi.getHomebridge();
+    plugins.push(homebridge);
+
+    const results = plugins.filter(plugin => plugin.updateAvailable);
+    this.log.debug('homebridge-config-ui-x reports ' + results.length +
+      ' outdated package(s): ' + JSON.stringify(results));
+
+    return results.length;
+  }
+
+  doCheck(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+
+    const check = this.useNcu ? this.checkNcu() : this.checkUi();
+
+    check
+      .then(updates => {
+        this.service?.setCharacteristic(this.characteristicType, updates > 0);
+      })
+      .catch(ex => {
+        this.log.error(ex);
       })
       .finally(((): void => {
-        this.timer = setTimeout(this.fetchData.bind(this), this.checkFrequency * 60 * 1000);
+        this.timer = setTimeout(this.doCheck.bind(this), 8 * 60 * 60 * 1000);
       }).bind(this));
   }
 
   configureAccessory(accessory: PlatformAccessory): void {
     accessory.on(PlatformAccessoryEvent.IDENTIFY, () => {
-      this.log(accessory.displayName, 'identify requested!');
+      this.log(accessory.displayName + ' identify requested!');
     });
 
     const accInfo = accessory.getService(hap.Service.AccessoryInformation);
@@ -100,22 +133,23 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
         .setCharacteristic(hap.Characteristic.SerialNumber, hostname());
     }
 
-    this.accessory = accessory;
+    this.service = accessory.getService(this.serviceType);
+    this.service?.setCharacteristic(this.characteristicType, false);
   }
 
   addUpdateAccessory(): void {
-    if (!this.accessory) {
+    if (!this.service) {
       const uuid = hap.uuid.generate(PLATFORM_NAME);
       const newAccessory = new Accessory('Plugin Update Check', uuid);
 
-      newAccessory.addService(hap.Service.MotionSensor);
+      newAccessory.addService(this.serviceType);
 
       this.configureAccessory(newAccessory);
 
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [newAccessory]);
     }
 
-    this.fetchData();
+    this.timer = setTimeout(this.doCheck.bind(this), 60 * 1000); // Onzu recommends waiting 60 seconds on start
   }
 }
 

@@ -1,9 +1,10 @@
 # homebridge-plugin-update-check
 
-[![npm](https://img.shields.io/npm/v/homebridge-plugin-update-check) ![npm](https://img.shields.io/npm/dt/homebridge-plugin-update-check)](https://www.npmjs.com/package/homebridge-plugin-update-check)
-
+[![npm](https://img.shields.io/npm/v/homebridge-plugin-update-check) ![npm](https://img.shields.io/npm/dt/homebridge-plugin-update-check)](https://www.npmjs.com/package/homebridge-plugin-update-check) [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 
 A [Homebridge](https://github.com/nfarina/homebridge) plugin for checking for updates to Homebridge and plugins.
+
+This will use [homebridge-config-ui-x](https://www.npmjs.com/package/homebridge-config-ui-x) when available, but will fall back to using [npm-check-updates](https://www.npmjs.com/package/npm-check-updates) if it is not.
 
 ## Installation
 
@@ -19,7 +20,7 @@ Configuration sample:
 "platforms": [
     {
         "platform": "PluginUpdate",
-        "checkFrequency": 30
+        "forceNcu": false
     }
 ]
 ```
@@ -27,4 +28,4 @@ Configuration sample:
 #### Fields
 
 * "platform": Must always be "PluginUpdate" (required)
-* "checkFrequency": Number of minutes between checks for updates. (Default: `30`)
+* "forceNcu": Force use of node-check-updates instead of homebridge-config-ui-x. (Default: `false`)
