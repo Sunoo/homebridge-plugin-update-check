@@ -32,8 +32,8 @@ interface UiConfig {
 
 export class UiApi {
   private readonly secrets?: SecretsFile;
-  private readonly ssl?: boolean;
   private readonly baseUrl?: string;
+  private readonly httpsAgent?: https.Agent;
   private token?: string;
 
   constructor(hbStoragePath: string) {
@@ -46,13 +46,17 @@ export class UiApi {
       const secretPath = path.resolve(hbStoragePath, '.uix-secrets');
       this.secrets = JSON.parse(readFileSync(secretPath, 'utf8'));
 
-      this.ssl = !!config.ssl?.key || !!config.ssl?.pfx;
+      const ssl = !!config.ssl?.key || !!config.ssl?.pfx;
 
-      const protocol = this.ssl ? 'https://' : 'http://';
+      const protocol = ssl ? 'https://' : 'http://';
       const host = config.host ?? 'localhost';
       const port = config.port ?? 8581;
 
       this.baseUrl = protocol + host + ':' + port.toString();
+
+      if (ssl) {
+        this.httpsAgent = new https.Agent({ rejectUnauthorized: false }); // don't reject self-signed certs
+      }
     }
   }
 
@@ -86,7 +90,7 @@ export class UiApi {
       headers: {
         Authorization: 'Bearer ' + this.getToken()
       },
-      httpAgent: this.ssl ? new https.Agent({ rejectUnauthorized: false }) : undefined
+      httpsAgent: this.httpsAgent
     });
 
     return response.data;
