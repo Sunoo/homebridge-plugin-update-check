@@ -30,9 +30,12 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
   private readonly config: PluginUpdatePlatformConfig;
   private readonly uiApi: UiApi;
   private readonly useNcu: boolean;
+  private readonly updateType: string;
   private readonly isDocker: boolean;
-  private readonly serviceType: WithUUID<typeof Service> = hap.Service.MotionSensor;
-  private readonly characteristicType: WithUUID<new () => Characteristic> = hap.Characteristic.MotionDetected;
+  private readonly updateService!: WithUUID<typeof Service>;
+  private readonly serviceType: WithUUID<typeof Service> = this.updateTypeService();
+  private readonly updateCharacteristic!: WithUUID<new () => Characteristic>;
+  private readonly characteristicType: WithUUID<new () => Characteristic> = this.updateTypeCharacteristic();
   private service?: Service;
   private timer?: NodeJS.Timeout;
 
@@ -44,6 +47,7 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
     this.uiApi = new UiApi(this.api.user.storagePath());
     this.useNcu = this.config.forceNcu || !this.uiApi.isConfigured();
     this.isDocker = fs.existsSync('/homebridge/package.json');
+    this.updateType = this.config.updateType || 'motion';
 
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.addUpdateAccessory.bind(this));
   }
@@ -89,7 +93,7 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
 
     if (this.isDocker) {
       const dockerResults = await this.runNcu(['--packageFile', '/homebridge/package.json']);
-      results = {...results, ...dockerResults};
+      results = { ...results, ...dockerResults };
     }
 
     const updates = Object.keys(results).length;
@@ -160,6 +164,34 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
     }
 
     this.timer = setTimeout(this.doCheck.bind(this), 60 * 1000); // Onzu recommends waiting 60 seconds on start
+  }
+
+  updateTypeCharacteristic(): WithUUID<new () => Characteristic> {
+    switch (this.updateType) {
+      case 'contact':
+        this.updateCharacteristic === hap.Characteristic.ContactSensorState;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'motion':
+      default:
+        this.updateCharacteristic ===  hap.Characteristic.MotionDetected;
+        this.log.debug(`Update Type: ${this.updateType}`);
+    }
+    return this.updateCharacteristic;
+  }
+
+  updateTypeService(): WithUUID<typeof Service> {
+    switch (this.updateType) {
+      case 'contact':
+        this.updateService === hap.Service.ContactSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'motion':
+      default:
+        this.updateService ===  hap.Service.MotionSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+    }
+    return this.updateService;
   }
 }
 
