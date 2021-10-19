@@ -18,6 +18,25 @@
                 "title": "Force node-check-updates",
                 "type": "boolean",
                 "description": "Force use of node-check-updates instead of homebridge-config-ui-x."
+            },
+            "updateType": {
+                "title": "HomeKit Type",
+                "type": "string",
+                "description": "Force use of node-check-updates instead of homebridge-config-ui-x.",
+                "oneOf": [
+                    {
+                      "title": "Contact Sensor",
+                      "enum": [
+                        "contact"
+                      ]
+                    },
+                    {
+                      "title": "Motion Sensor",
+                      "enum": [
+                        "motion"
+                      ]
+                    }
+                  ]
             }
         }
     }
