@@ -35,6 +35,54 @@
                       "enum": [
                         "motion"
                       ]
+                    },
+                    {
+                      "title": "Leak Sensor",
+                      "enum": [
+                        "leak"
+                      ]
+                    },
+                    {
+                      "title": "Smoke Sensor",
+                      "enum": [
+                        "smoke"
+                      ]
+                    },
+                    {
+                      "title": "Occupancy Sensor",
+                      "enum": [
+                        "occupancy"
+                      ]
+                    },
+                    {
+                      "title": "Light Sensor",
+                      "enum": [
+                        "light"
+                      ]
+                    },
+                    {
+                      "title": "Humidity Sensor",
+                      "enum": [
+                        "humidity"
+                      ]
+                    },
+                    {
+                      "title": "Carbon Monoxide Sensor",
+                      "enum": [
+                        "monoxide"
+                      ]
+                    },
+                    {
+                      "title": "Carbon Dioxide Sensor",
+                      "enum": [
+                        "dioxide"
+                      ]
+                    },
+                    {
+                      "title": "Air Quality Sensor",
+                      "enum": [
+                        "air"
+                      ]
                     }
                   ]
             }

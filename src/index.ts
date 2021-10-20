@@ -2,6 +2,7 @@ import {
   API,
   APIEvent,
   Characteristic,
+  CharacteristicValue,
   DynamicPlatformPlugin,
   HAP,
   Logging,
@@ -32,6 +33,7 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
   private readonly useNcu: boolean;
   private readonly updateType: string;
   private readonly isDocker: boolean;
+  private readonly updateValue!: CharacteristicValue;
   private readonly updateService!: WithUUID<typeof Service>;
   private readonly serviceType: WithUUID<typeof Service> = this.updateTypeService();
   private readonly updateCharacteristic!: WithUUID<new () => Characteristic>;
@@ -124,7 +126,7 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
 
     check
       .then(updates => {
-        this.service?.setCharacteristic(this.characteristicType, updates > 0);
+        this.service?.setCharacteristic(this.characteristicType, updates > this.value());
       })
       .catch(ex => {
         this.log.error(ex);
@@ -148,7 +150,7 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
     }
 
     this.service = accessory.getService(this.serviceType);
-    this.service?.setCharacteristic(this.characteristicType, false);
+    this.service?.setCharacteristic(this.characteristicType, this.value());
   }
 
   addUpdateAccessory(): void {
@@ -166,15 +168,78 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
     this.timer = setTimeout(this.doCheck.bind(this), 60 * 1000); // Onzu recommends waiting 60 seconds on start
   }
 
+  value(): CharacteristicValue {
+    switch (this.updateType) {
+      case 'contact':
+      case 'occupancy':
+      case 'smoke':
+      case 'monoxide':
+      case 'dioxide':
+      case 'leak':
+        this.updateValue === 0;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'light':
+        this.updateValue === 0; //0.0001 to 100000?
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'humidity':
+        this.updateValue === 0; // 0 to 100?
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'air':
+        this.updateValue === 1; // 1 to 5?
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'motion':
+      default:
+        this.updateValue === false;
+        this.log.debug(`Update Type: ${this.updateType}`);
+    }
+    return this.updateValue;
+  }
+
   updateTypeCharacteristic(): WithUUID<new () => Characteristic> {
     switch (this.updateType) {
       case 'contact':
         this.updateCharacteristic === hap.Characteristic.ContactSensorState;
         this.log.debug(`Update Type: ${this.updateType}`);
         break;
+      case 'occupancy':
+        this.updateCharacteristic === hap.Characteristic.OccupancyDetected;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'smoke':
+        this.updateCharacteristic === hap.Characteristic.SmokeDetected;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'leak':
+        this.updateCharacteristic === hap.Characteristic.LeakDetected;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'light':
+        this.updateCharacteristic === hap.Characteristic.CurrentAmbientLightLevel;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'humidity':
+        this.updateCharacteristic === hap.Characteristic.CurrentRelativeHumidity;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'monoxide':
+        this.updateCharacteristic === hap.Characteristic.CarbonMonoxideDetected;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'dioxide':
+        this.updateCharacteristic === hap.Characteristic.CarbonDioxideDetected;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'air':
+        this.updateCharacteristic === hap.Characteristic.AirQuality;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
       case 'motion':
       default:
-        this.updateCharacteristic ===  hap.Characteristic.MotionDetected;
+        this.updateCharacteristic === hap.Characteristic.MotionDetected;
         this.log.debug(`Update Type: ${this.updateType}`);
     }
     return this.updateCharacteristic;
@@ -186,9 +251,41 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
         this.updateService === hap.Service.ContactSensor;
         this.log.debug(`Update Type: ${this.updateType}`);
         break;
+      case 'occupancy':
+        this.updateService === hap.Service.OccupancySensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'smoke':
+        this.updateService === hap.Service.SmokeSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'leak':
+        this.updateService === hap.Service.LeakSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'light':
+        this.updateService === hap.Service.LightSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'humidity':
+        this.updateService === hap.Service.HumiditySensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'monoxide':
+        this.updateService === hap.Service.CarbonMonoxideSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'dioxide':
+        this.updateService === hap.Service.CarbonDioxideSensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
+      case 'air':
+        this.updateService === hap.Service.AirQualitySensor;
+        this.log.debug(`Update Type: ${this.updateType}`);
+        break;
       case 'motion':
       default:
-        this.updateService ===  hap.Service.MotionSensor;
+        this.updateService === hap.Service.MotionSensor;
         this.log.debug(`Update Type: ${this.updateType}`);
     }
     return this.updateService;
