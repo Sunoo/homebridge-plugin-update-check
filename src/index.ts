@@ -12,10 +12,10 @@ import {
   Service,
   WithUUID
 } from 'homebridge';
+import { spawn } from 'child_process';
 import fs from 'fs';
-import ncu from 'npm-check-updates';
-import { Index, VersionSpec } from 'npm-check-updates/build/src/types';
 import { hostname } from 'os';
+import path from 'path';
 import { PluginUpdatePlatformConfig } from './configTypes';
 import { UiApi } from './ui-api';
 
@@ -56,18 +56,52 @@ class PluginUpdatePlatform implements DynamicPlatformPlugin {
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.addUpdateAccessory.bind(this));
   }
 
-  async checkNcu(): Promise<number> {
-    const ncuFilter = '/^(@.*\\/)?homebridge(-.*)?$/';
+  async runNcu(args: Array<string>): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+    args = [
+      path.resolve(__dirname, '../node_modules/npm-check-updates/build/src/bin/cli.js'),
+      '--jsonUpgraded',
+      '--filter',
+      '/^(@.*\\/)?homebridge(-.*)?$/'
+    ].concat(args);
 
-    let results = await ncu({ global: true, filter: ncuFilter }) as Index<VersionSpec>;
+    const output = await new Promise<string>((resolve, reject) => {
+      try {
+        const ncu = spawn(process.argv0, args, {
+          env: this.isDocker ? { ...process.env, HOME: '/homebridge' } : undefined
+        });
+        let stdout = '';
+        ncu.stdout.on('data', (chunk: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+          stdout += chunk.toString();
+        });
+        let stderr = '';
+        ncu.stderr.on('data', (chunk: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+          stderr += chunk.toString();
+        });
+        ncu.on('close', () => {
+          if (stderr) {
+            reject(stderr);
+          } else {
+            resolve(stdout);
+          }
+        });
+      } catch (ex) {
+        reject(ex);
+      }
+    });
+
+    return JSON.parse(output);
+  }
+
+  async checkNcu(): Promise<number> {
+    let results = await this.runNcu(['--global']);
 
     if (this.isDocker) {
-      const dockerResults = await ncu({ packageFile: '/homebridge/package.json', filter: ncuFilter }) as Index<VersionSpec>;
+      const dockerResults = await this.runNcu(['--packageFile', '/homebridge/package.json']);
       results = { ...results, ...dockerResults };
     }
 
     const updates = Object.keys(results).length;
-    this.log.debug('node-check-updates reports ' + updates +
+    this.log.debug('npm-check-updates reports ' + updates +
       ' outdated package(s): ' + JSON.stringify(results));
 
     return updates;
