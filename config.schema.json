@@ -64,7 +64,7 @@
                   ]
             },
             "forceNcu": {
-                "title": "Force node-check-updates",
+                "title": "Force npm-check-updates",
                 "type": "boolean",
                 "description": "Force use of node-check-updates instead of homebridge-config-ui-x."
             }

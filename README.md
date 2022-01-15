@@ -30,4 +30,4 @@ Configuration sample:
 
 * "platform": Must always be "PluginUpdate" (required)
 * "sensorType": What type of sensor will be exposed to HomeKit. Can be `motion`, `contact`, `occupancy`, `humidity`, `light`, `air`, `leak`, `smoke`, `dioxide`, or `monoxide` (Default: `motion`)
-* "forceNcu": Force use of node-check-updates instead of homebridge-config-ui-x. (Default: `false`)
+* "forceNcu": Force use of npm-check-updates instead of homebridge-config-ui-x. (Default: `false`)
