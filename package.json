@@ -71,7 +71,7 @@
   },
   "dependencies": {
     "axios": "^0.26.1",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "npm-check-updates": "^12.5.4"
   }
 }
