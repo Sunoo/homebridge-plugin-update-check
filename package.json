@@ -72,6 +72,6 @@
   "dependencies": {
     "axios": "^0.26.1",
     "jsonwebtoken": "^8.5.1",
-    "npm-check-updates": "^12.5.4"
+    "npm-check-updates": "^16.7.4"
   }
 }
